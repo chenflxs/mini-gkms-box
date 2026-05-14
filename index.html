@@ -21,10 +21,22 @@
 
         /* 筛选按钮 */
         .filter-btn {
-            height: 38px; min-width: 80px; flex: 1;
+            height: 38px; min-width: 0;
             display: flex; align-items: center; justify-content: center;
             border-radius: 8px; font-weight: 800; font-size: 11px;
             transition: all 0.2s ease; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .filter-select {
+            height: 42px;
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 13px;
+            font-weight: 800;
+            padding: 0 12px;
+            outline: none;
         }
 
         .btn-ssr-active {
@@ -65,6 +77,53 @@
             border-color: rgba(129, 140, 248, 0.95);
             box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
         }
+        .nav-btn {
+            min-height: 42px;
+            border-radius: 10px;
+            padding: 0 18px;
+            font-size: 13px;
+            font-weight: 900;
+            border: 1px solid rgba(148, 163, 184, 0.14);
+            background: #0f172a;
+            color: #94a3b8;
+            transition: all 0.2s ease;
+        }
+        .nav-btn-active {
+            background: linear-gradient(135deg, #4f46e5, #06b6d4);
+            color: #ffffff;
+            border-color: rgba(129, 140, 248, 0.8);
+            box-shadow: 0 10px 30px rgba(79, 70, 229, 0.28);
+        }
+        .cidol-img { opacity: 0; transition: opacity 0.25s ease-out; }
+        .cidol-img-loaded { opacity: 1 !important; }
+        .cidol-selected {
+            border-color: rgba(34, 211, 238, 0.9);
+            box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.26), 0 12px 30px rgba(8, 145, 178, 0.18);
+        }
+        .stat-panel {
+            background: rgba(15, 23, 42, 0.82);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            border-radius: 16px;
+            padding: 12px;
+        }
+        .stat-chip {
+            min-height: 50px;
+            border-radius: 12px;
+            background: rgba(2, 6, 23, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            padding: 8px 10px;
+        }
+        .stat-meter {
+            height: 4px;
+            border-radius: 999px;
+            background: rgba(51, 65, 85, 0.8);
+            overflow: hidden;
+        }
+        .stat-meter-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #6366f1, #06b6d4);
+        }
     </style>
 </head>
 <body class="antialiased select-none">
@@ -73,13 +132,17 @@
         <header class="mb-6 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <div>
                 <h1 class="text-2xl sm:text-3xl font-black text-indigo-500 tracking-tighter mb-4">学园偶像大师 BOX分享工具</h1>
-                <div class="flex gap-2">
+                <div v-if="activeMenu === 'support'" class="flex gap-2">
                     <button @click="importCode" class="text-[10px] bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 transition">导入代码</button>
                     <button @click="resetData" class="text-[10px] bg-red-950/30 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-900/50 transition">清空数据</button>
                 </div>
+                <div v-if="activeMenu === 'cidol'" class="flex gap-2">
+                    <button @click="importCidolCode" class="text-[10px] bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-700 transition">导入代码</button>
+                    <button @click="resetCidolData" class="text-[10px] bg-red-950/30 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-900/50 transition">清空数据</button>
+                </div>
             </div>
             
-            <div class="flex flex-col items-end gap-3 w-full lg:w-auto">
+            <div v-if="activeMenu === 'support'" class="flex flex-col items-end gap-3 w-full lg:w-auto">
                 <button @click="generateSummaryImage" :disabled="isGenerating || ownedCount === 0"
                         class="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white px-8 py-3 rounded-xl font-bold transition w-full lg:w-auto shadow-xl">
                     <span v-if="isGenerating" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
@@ -90,18 +153,64 @@
                     <div class="font-mono text-[10px] text-indigo-400 truncate">{{ exportString || 'Waiting...' }}</div>
                 </div>
             </div>
+            <div v-if="activeMenu === 'cidol'" class="flex flex-col items-end gap-3 w-full lg:w-auto">
+                <button @click="generateCidolSummaryImage" :disabled="isGenerating || cidolOwnedCount === 0"
+                        class="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white px-8 py-3 rounded-xl font-bold transition w-full lg:w-auto shadow-xl">
+                    <span v-if="isGenerating" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                    <span>{{ isGenerating ? '正在绘图...' : '生成汇总长图' }}</span>
+                </button>
+                <div @click="copyCidolResult" class="bg-slate-900 border border-slate-800 rounded-2xl p-3 cursor-pointer w-full lg:max-w-md group relative text-right">
+                    <div class="text-[8px] text-slate-500 mb-1 uppercase tracking-widest font-bold">角色皮肤代码 (点击复制)</div>
+                    <div class="font-mono text-[10px] text-indigo-400 truncate">{{ cidolExportString || 'Waiting...' }}</div>
+                </div>
+            </div>
         </header>
 
-        <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-800/50 mb-6">
-            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-                <button @click="toggleRarityFilter('3')" :class="[selectedRarities.includes('3') ? 'btn-ssr-active' : 'btn-inactive']" class="filter-btn">SSR</button>
-                <button @click="toggleRarityFilter('2')" :class="[selectedRarities.includes('2') ? 'btn-sr-active' : 'btn-inactive']" class="filter-btn">SR</button>
-                <div class="hidden sm:block w-px h-8 bg-slate-800 mx-1"></div>
-                <button @click="toggleFilter('vo')" :class="[selectedAttrs.includes('vo') ? 'btn-vo-active' : 'btn-inactive']" class="filter-btn text-[10px]">VOCAL</button>
-                <button @click="toggleFilter('da')" :class="[selectedAttrs.includes('da') ? 'btn-da-active' : 'btn-inactive']" class="filter-btn text-[10px]">DANCE</button>
-                <button @click="toggleFilter('vi')" :class="[selectedAttrs.includes('vi') ? 'btn-vi-active' : 'btn-inactive']" class="filter-btn text-[10px]">VISUAL</button>
-                <button @click="toggleFilter('as')" :class="[selectedAttrs.includes('as') ? 'btn-as-active' : 'btn-inactive']" class="filter-btn text-[10px]">ASSIST</button>
-                <button v-if="selectedAttrs.length > 0 || selectedRarities.length > 0" @click="clearAllFilters" class="ml-auto text-[10px] font-bold text-slate-500 hover:text-red-400 px-2 transition-colors">RESET ✕</button>
+        <nav class="mb-6 flex flex-wrap gap-2 bg-slate-950/70 border border-slate-800/70 rounded-2xl p-2">
+            <button @click="activeMenu = 'support'" :class="['nav-btn flex-1 sm:flex-none', activeMenu === 'support' ? 'nav-btn-active' : '']">支援卡</button>
+            <button @click="activeMenu = 'cidol'" :class="['nav-btn flex-1 sm:flex-none', activeMenu === 'cidol' ? 'nav-btn-active' : '']">角色与皮肤</button>
+        </nav>
+
+        <section class="stat-panel mb-6">
+            <div class="grid grid-cols-1 xl:grid-cols-[220px_1fr] gap-3">
+                <div class="stat-chip">
+                    <div class="flex items-end justify-between gap-3">
+                        <div>
+                            <div class="text-[10px] text-slate-500 font-black tracking-widest">全部</div>
+                            <div class="text-2xl font-black text-white leading-none mt-1">{{ activeStats.owned }}/{{ activeStats.total }}</div>
+                        </div>
+                        <div class="text-lg font-black text-cyan-300">{{ activeStats.percent }}%</div>
+                    </div>
+                    <div class="stat-meter mt-3"><div class="stat-meter-fill" :style="{ width: activeStats.percent + '%' }"></div></div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-2">
+                    <div v-for="stat in activeDetailStats" :key="stat.key" class="stat-chip">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="text-[11px] font-black text-slate-200 truncate">{{ stat.name }}</div>
+                            <div class="text-[11px] font-black text-cyan-300 shrink-0">{{ stat.percent }}%</div>
+                        </div>
+                        <div class="text-[12px] font-black text-slate-400 mt-1">{{ stat.owned }}/{{ stat.total }}</div>
+                        <div class="stat-meter mt-2"><div class="stat-meter-fill" :style="{ width: stat.percent + '%' }"></div></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section v-if="activeMenu === 'support'">
+        <div class="bg-slate-900/60 p-3 sm:p-4 rounded-2xl border border-slate-800/50 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-[180px_1fr_auto] gap-3 md:items-center">
+                <div class="grid grid-cols-2 gap-2">
+                    <button @click="toggleRarityFilter('3')" :class="[selectedRarities.includes('3') ? 'btn-ssr-active' : 'btn-inactive']" class="filter-btn">SSR</button>
+                    <button @click="toggleRarityFilter('2')" :class="[selectedRarities.includes('2') ? 'btn-sr-active' : 'btn-inactive']" class="filter-btn">SR</button>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button @click="toggleFilter('vo')" :class="[selectedAttrs.includes('vo') ? 'btn-vo-active' : 'btn-inactive']" class="filter-btn text-[10px]">VOCAL</button>
+                    <button @click="toggleFilter('da')" :class="[selectedAttrs.includes('da') ? 'btn-da-active' : 'btn-inactive']" class="filter-btn text-[10px]">DANCE</button>
+                    <button @click="toggleFilter('vi')" :class="[selectedAttrs.includes('vi') ? 'btn-vi-active' : 'btn-inactive']" class="filter-btn text-[10px]">VISUAL</button>
+                    <button @click="toggleFilter('as')" :class="[selectedAttrs.includes('as') ? 'btn-as-active' : 'btn-inactive']" class="filter-btn text-[10px]">ASSIST</button>
+                </div>
+                <button v-if="selectedAttrs.length > 0 || selectedRarities.length > 0" @click="clearAllFilters" class="filter-btn btn-inactive md:w-24 text-[10px] hover:text-red-400 transition-colors">RESET</button>
             </div>
         </div>
 
@@ -156,6 +265,59 @@
                 </div>
             </div>
         </div>
+        </section>
+
+        <section v-if="activeMenu === 'cidol'" class="space-y-6">
+            <div class="bg-slate-900/60 p-3 sm:p-4 rounded-2xl border border-slate-800/50">
+                <div class="grid grid-cols-1 lg:grid-cols-[1fr_180px] gap-3 lg:items-start">
+                    <div>
+                        <select v-model="selectedCidolCharacter" class="filter-select sm:hidden">
+                            <option value="all">ALL</option>
+                            <option v-for="character in cidolCharacters" :key="'select-' + character.code" :value="character.code">{{ character.name }}</option>
+                        </select>
+                        <div class="hidden sm:grid sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-2">
+                            <button @click="selectedCidolCharacter = 'all'" :class="['filter-btn', selectedCidolCharacter === 'all' ? 'nav-btn-active' : 'btn-inactive']">ALL</button>
+                        <button
+                            v-for="character in cidolCharacters"
+                            :key="character.code"
+                            @click="selectedCidolCharacter = character.code"
+                            :class="['filter-btn', selectedCidolCharacter === character.code ? 'nav-btn-active' : 'btn-inactive']"
+                        >
+                            {{ character.name }}
+                        </button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button @click="cidolVariant = '1'" :class="['filter-btn', cidolVariant === '1' ? 'btn-ssr-active' : 'btn-inactive']">特训后</button>
+                        <button @click="cidolVariant = '0'" :class="['filter-btn', cidolVariant === '0' ? 'btn-ssr-active' : 'btn-inactive']">特训前</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-5">
+                <div
+                    v-for="skin in filteredCidolSkins"
+                    :key="skin.character + '-' + skin.rarity + '-' + skin.id"
+                    @click="toggleCidolSkin(skin)"
+                    :class="['bg-slate-950 border rounded-xl overflow-hidden cursor-pointer transition active:scale-[0.98]', skin.owned ? 'cidol-selected' : 'border-slate-800']"
+                >
+                    <div class="relative aspect-[3/4] bg-slate-900">
+                        <img
+                            :src="cidolImagePath(skin)"
+                            loading="lazy"
+                            @load="skin.loaded = true"
+                            :class="['w-full h-full object-contain cidol-img', skin.loaded ? 'cidol-img-loaded' : '', skin.owned ? '' : 'is-unowned']"
+                        >
+                        <div v-if="!skin.owned && skin.loaded" class="absolute inset-0 unowned-mask z-10 pointer-events-none"></div>
+                        <div v-if="skin.owned" class="absolute top-2 right-2 z-20 bg-cyan-500 text-white text-[10px] font-black px-2 py-1 rounded-lg shadow-lg">已选</div>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 px-3 py-2 text-[11px] font-bold">
+                        <span class="text-slate-200 truncate">{{ getCidolName(skin.character) }}</span>
+                        <span class="text-indigo-300 truncate text-right">{{ getCidolCardLabel(skin) }}</span>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/95" @click.self="showModal = false">
             <div class="bg-slate-900 p-5 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col border border-slate-800">
@@ -173,16 +335,58 @@
     <script>
         const { createApp } = Vue;
         const STORAGE_KEY = 'gakuen_box_data_v5';
+        const CIDOL_STORAGE_KEY = 'gakuen_cidol_box_data_v1';
+        const CIDOL_NAMES = {
+            ttmr: '月村手毬',
+            ssmk: '紫云清夏',
+            shro: '筱泽广',
+            kllj: '葛城莉莉娅',
+            jsna: '十王星南',
+            kcna: '仓本千奈',
+            hume: '花海佑芽',
+            hski: '花海咲季',
+            hrnm: '姬崎莉波',
+            hmsz: '秦谷美铃',
+            fktn: '藤田琴音',
+            atbm: '雨夜燕',
+            amao: '有村麻央'
+        };
 
         createApp({
             data() { 
                 return { 
-                    cards: [], showModal: false, generatedImageSrc: null, 
-                    isGenerating: false, selectedAttrs: [], selectedRarities: []
+                    activeMenu: 'support',
+                    cards: [], cidolSkins: [], cidolCardNames: {}, showModal: false, generatedImageSrc: null,
+                    isGenerating: false, selectedAttrs: [], selectedRarities: [],
+                    selectedCidolCharacter: 'all', cidolVariant: '1'
                 } 
             },
             computed: {
                 ownedCount() { return this.cards.filter(c => c.breakLevel >= 0).length; },
+                cidolOwnedCount() { return this.cidolSkins.filter(s => s.owned).length; },
+                activeStats() {
+                    if (this.activeMenu === 'cidol') return this.makeStat('all-cidol', '全部', this.cidolOwnedCount, this.cidolSkins.length);
+                    return this.makeStat('all-support', '全部', this.ownedCount, this.cards.length);
+                },
+                activeDetailStats() {
+                    if (this.activeMenu === 'cidol') {
+                        return this.cidolCharacters.map(character => {
+                            const list = this.cidolSkins.filter(s => s.character === character.code);
+                            return this.makeStat(character.code, character.name, list.filter(s => s.owned).length, list.length);
+                        });
+                    }
+
+                    const rarityStats = [
+                        this.makeStat('ssr', 'SSR', this.cards.filter(c => c.rarity === '3' && c.breakLevel >= 0).length, this.cards.filter(c => c.rarity === '3').length),
+                        this.makeStat('sr', 'SR', this.cards.filter(c => c.rarity === '2' && c.breakLevel >= 0).length, this.cards.filter(c => c.rarity === '2').length)
+                    ];
+                    const attrNames = { vo: 'VOCAL', da: 'DANCE', vi: 'VISUAL', as: 'ASSIST' };
+                    const attrStats = Object.entries(attrNames).map(([attr, name]) => {
+                        const list = this.cards.filter(c => c.attribute === attr);
+                        return this.makeStat(attr, name, list.filter(c => c.breakLevel >= 0).length, list.length);
+                    });
+                    return [...rarityStats, ...attrStats];
+                },
                 // Base64 编码
                 exportString() { 
                     const rawString = [...this.cards].filter(c => c.breakLevel >= 0)
@@ -191,14 +395,154 @@
                     
                     return rawString ? btoa(rawString) : '';
                 },
+                cidolExportString() {
+                    const rawString = [...this.cidolSkins].filter(s => s.owned)
+                        .sort((a, b) => {
+                            const charSort = a.character.localeCompare(b.character);
+                            return charSort || (Number(b.rarity) - Number(a.rarity)) || b.id.localeCompare(a.id);
+                        })
+                        .map(s => `${s.character}-${s.rarity}-${s.id}`).join(',');
+
+                    return rawString ? btoa(rawString) : '';
+                },
                 filteredCards() {
                     let result = [...this.cards];
                     if (this.selectedRarities.length > 0) result = result.filter(c => this.selectedRarities.includes(c.rarity));
                     if (this.selectedAttrs.length > 0) result = result.filter(c => c.attribute && this.selectedAttrs.includes(c.attribute));
                     return result.sort((a, b) => (Number(b.rarity) - Number(a.rarity)) || (Number(b.id) - Number(a.id)));
+                },
+                cidolCharacters() {
+                    const presentCodes = [...new Set(this.cidolSkins.map(s => s.character))];
+                    const knownCodes = Object.keys(CIDOL_NAMES).filter(code => presentCodes.includes(code));
+                    const unknownCodes = presentCodes.filter(code => !CIDOL_NAMES[code]).sort();
+                    return [...knownCodes, ...unknownCodes].map(code => ({ code, name: this.getCidolName(code) }));
+                },
+                filteredCidolSkins() {
+                    let result = [...this.cidolSkins];
+                    if (this.selectedCidolCharacter !== 'all') {
+                        result = result.filter(s => s.character === this.selectedCidolCharacter);
+                    }
+                    return result.sort((a, b) => {
+                        const charSort = this.getCidolName(a.character).localeCompare(this.getCidolName(b.character), 'ja');
+                        return charSort || (Number(b.rarity) - Number(a.rarity)) || a.id.localeCompare(b.id);
+                    });
                 }
             },
             methods: {
+                makeStat(key, name, owned, total) {
+                    const percent = total > 0 ? Math.round((owned / total) * 100) : 0;
+                    return { key, name, owned, total, percent };
+                },
+                getCidolName(code) {
+                    return CIDOL_NAMES[code] || code.toUpperCase();
+                },
+                cidolRarityLabel(rarity) {
+                    return rarity === '3' ? 'SSR' : rarity === '2' ? 'SR' : 'R';
+                },
+                getCidolCardLabel(skin) {
+                    return this.cidolCardNames[this.cidolKey(skin)] || `${this.cidolRarityLabel(skin.rarity)} ${String(Number(skin.id)).padStart(2, '0')}`;
+                },
+                parseCsv(text) {
+                    const rows = [];
+                    let row = [], cell = '', quoted = false;
+                    for (let i = 0; i < text.length; i++) {
+                        const ch = text[i];
+                        const next = text[i + 1];
+                        if (quoted) {
+                            if (ch === '"' && next === '"') { cell += '"'; i++; }
+                            else if (ch === '"') quoted = false;
+                            else cell += ch;
+                        } else if (ch === '"') {
+                            quoted = true;
+                        } else if (ch === ',') {
+                            row.push(cell); cell = '';
+                        } else if (ch === '\n') {
+                            row.push(cell); rows.push(row); row = []; cell = '';
+                        } else if (ch !== '\r') {
+                            cell += ch;
+                        }
+                    }
+                    if (cell || row.length) { row.push(cell); rows.push(row); }
+                    return rows;
+                },
+                async initCidolCardNames() {
+                    try {
+                        const response = await fetch('./cidol_cards.csv');
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        const rows = this.parseCsv(await response.text());
+                        const [rawHeader, ...items] = rows;
+                        if (!rawHeader) return;
+                        const header = rawHeader.map(value => value.replace(/^\uFEFF/, '').trim());
+                        const idIndex = header.indexOf('编号');
+                        const nameIndex = header.indexOf('卡名');
+                        if (idIndex === -1 || nameIndex === -1) return;
+
+                        const names = {};
+                        items.forEach(row => {
+                            const id = row[idIndex] && row[idIndex].trim();
+                            const name = row[nameIndex] && row[nameIndex].trim();
+                            if (id && name) names[id] = name;
+                        });
+                        this.cidolCardNames = names;
+                    } catch (e) {
+                        console.warn('cidol_cards.csv 读取失败，角色皮肤将显示编号。', e);
+                    }
+                },
+                cidolDisplayVariant(skin) {
+                    if (!skin.variants || skin.variants.includes(this.cidolVariant)) return this.cidolVariant;
+                    return skin.variants.includes('1') ? '1' : '0';
+                },
+                cidolImagePath(skin) {
+                    return `./static/cidol/img_general_cidol-${skin.character}-${skin.rarity}-${skin.id}_${this.cidolDisplayVariant(skin)}-full.webp`;
+                },
+                cidolKey(skin) {
+                    return `${skin.character}-${skin.rarity}-${skin.id}`;
+                },
+                async initCidolSkins() {
+                    const localData = JSON.parse(localStorage.getItem(CIDOL_STORAGE_KEY) || '{}');
+                    if (window.location.protocol === 'file:') {
+                        alert("角色皮肤需要通过本地服务器读取 static/cidol 目录。请使用 http://127.0.0.1:8000/index.html 打开。");
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('./static/cidol/');
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                        const html = await response.text();
+                        const doc = new DOMParser().parseFromString(html, 'text/html');
+                        const skins = new Map();
+
+                        doc.querySelectorAll('a[href]').forEach(link => {
+                            const fileName = decodeURIComponent(link.getAttribute('href').split('/').pop());
+                            const match = fileName.match(/^img_general_cidol-([a-z0-9]+)-([123])-(\d{3})_([01])-full\.webp$/);
+                            if (!match) return;
+
+                            const [, character, rarity, id, variant] = match;
+                            const key = `${character}-${rarity}-${id}`;
+                            if (!skins.has(key)) {
+                                skins.set(key, { character, rarity, id, variants: new Set(), owned: !!localData[key], loaded: false });
+                            }
+                            skins.get(key).variants.add(variant);
+                        });
+
+                        this.cidolSkins = [...skins.values()]
+                            .filter(s => s.variants.has('0') || s.variants.has('1'))
+                            .map(s => ({ ...s, variants: [...s.variants] }));
+                    } catch (e) {
+                        console.error(e);
+                        alert("角色皮肤目录读取失败。请确认通过本地服务器访问，并且 static/cidol 目录允许目录索引。");
+                    }
+                },
+                toggleCidolSkin(skin) {
+                    skin.owned = !skin.owned;
+                    this.saveCidolToLocal();
+                },
+                saveCidolToLocal() {
+                    const storage = {};
+                    this.cidolSkins.forEach(s => { if (s.owned) storage[this.cidolKey(s)] = true; });
+                    localStorage.setItem(CIDOL_STORAGE_KEY, JSON.stringify(storage));
+                },
                 getLevelDisplay(card) {
                     const lv = card.breakLevel;
                     if (lv === -1) return 'OFF';
@@ -306,14 +650,94 @@
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(storage));
                 },
                 resetData() { if (confirm("确定重置？")) { this.cards.forEach(c => c.breakLevel = -1); this.saveToLocal(); } },
-                downloadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.crossOrigin="anonymous"; i.onload = () => res(i); i.onerror = rej; i.src = src; }); },
+                importCidolCode() {
+                    const input = prompt("请粘贴导出的角色皮肤代码字符串：");
+                    if (!input || input.trim() === "") return;
+
+                    let code = "";
+                    try {
+                        code = atob(input.trim());
+                    } catch (e) {
+                        alert("请检查代码：无效的 Base64 格式");
+                        return;
+                    }
+
+                    const items = code.split(',').map(item => item.trim()).filter(Boolean);
+                    const updates = [];
+
+                    for (const item of items) {
+                        const parts = item.split('-');
+                        if (parts.length !== 3) { alert("请检查代码：格式不正确"); return; }
+
+                        const [character, rarity, id] = parts;
+                        const paddedId = id.padStart(3, '0');
+                        const target = this.cidolSkins.find(s => s.character === character && s.rarity === rarity && s.id === paddedId);
+
+                        if (!target) {
+                            alert(`请检查代码：角色皮肤 ${character}-${rarity}-${paddedId} 不存在`);
+                            return;
+                        }
+
+                        updates.push(target);
+                    }
+
+                    this.cidolSkins.forEach(s => s.owned = false);
+                    updates.forEach(s => s.owned = true);
+                    this.saveCidolToLocal();
+                    alert("角色皮肤数据继承成功！");
+                },
+                resetCidolData() {
+                    if (confirm("确定清空角色皮肤数据？")) {
+                        this.cidolSkins.forEach(s => s.owned = false);
+                        this.saveCidolToLocal();
+                    }
+                },
+                downloadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); },
+                getSummaryLayout(count, baseCols, cardW, cardH, labelH = 0) {
+                    const maxCanvasHeight = 14000;
+                    const maxCanvasArea = 12000000;
+                    let cols = baseCols;
+                    let rows = Math.ceil(count / cols);
+                    while (rows * (cardH + labelH) > maxCanvasHeight && cols < 12) {
+                        cols += 1;
+                        rows = Math.ceil(count / cols);
+                    }
+
+                    const width = cols * cardW;
+                    const height = rows * (cardH + labelH);
+                    const heightScale = height > maxCanvasHeight ? maxCanvasHeight / height : 1;
+                    const areaScale = width * height > maxCanvasArea ? Math.sqrt(maxCanvasArea / (width * height)) : 1;
+                    const scale = Math.min(1, heightScale, areaScale);
+
+                    return {
+                        cols,
+                        cardW: Math.floor(cardW * scale),
+                        cardH: Math.floor(cardH * scale),
+                        labelH: Math.floor(labelH * scale),
+                        rows
+                    };
+                },
+                drawImageContain(ctx, img, x, y, w, h) {
+                    const ratio = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+                    const drawW = img.naturalWidth * ratio;
+                    const drawH = img.naturalHeight * ratio;
+                    ctx.drawImage(img, x + (w - drawW) / 2, y + (h - drawH) / 2, drawW, drawH);
+                },
+                ensureCanvasExportAllowed() {
+                    if (window.location.protocol === 'file:') {
+                        alert("当前是直接打开本地 HTML。浏览器会阻止本地图片导出长图，请通过本地服务器访问页面，例如 http://localhost:8000/");
+                        return false;
+                    }
+                    return true;
+                },
                 async generateSummaryImage() {
+                    if (!this.ensureCanvasExportAllowed()) return;
                     const list = this.filteredCards.filter(c => c.breakLevel >= 0);
                     if (list.length === 0) return;
                     this.isGenerating = true;
                     try {
-                        const cols = 3; const cardW = 640; const cardH = 360;
-                        const rows = Math.ceil(list.length / cols);
+                        const layout = this.getSummaryLayout(list.length, 3, 640, 360);
+                        const { cols, cardW, cardH, rows } = layout;
                         const canvas = document.createElement('canvas');
                         canvas.width = cols * cardW; canvas.height = rows * cardH;
                         const ctx = canvas.getContext('2d');
@@ -330,16 +754,59 @@
                             const c = list[i]; const x = (i % cols) * cardW; const y = Math.floor(i / cols) * cardH;
                             const img = await this.downloadImg(`./static/cards/s_card-${c.rarity}-${c.id}.webp`);
                             ctx.drawImage(img, x, y, cardW, cardH);
-                            ctx.drawImage(c.rarity==='3'?ui.ssr:ui.sr, x + 25, y + 25, 80, 40);
-                            if (c.attribute) ctx.drawImage(ui[c.attribute], x + cardW - 110, y + 15, 95, 95);
+                            ctx.drawImage(c.rarity==='3'?ui.ssr:ui.sr, x + cardW * 0.04, y + cardH * 0.07, cardW * 0.125, cardH * 0.11);
+                            if (c.attribute) ctx.drawImage(ui[c.attribute], x + cardW - cardW * 0.17, y + cardH * 0.04, cardW * 0.15, cardW * 0.15);
                             ctx.save(); ctx.shadowColor = 'black'; ctx.shadowBlur = 12;
-                            ctx.fillStyle = 'white'; ctx.font = 'italic 900 70px Arial Black'; 
-                            ctx.fillText(this.getLevelDisplay(c), x + 30, y + cardH - 30);
+                            ctx.fillStyle = 'white'; ctx.font = `italic 900 ${Math.floor(cardW * 0.11)}px Arial Black`;
+                            ctx.fillText(this.getLevelDisplay(c), x + cardW * 0.05, y + cardH - cardH * 0.08);
                             ctx.restore();
                         }
                         this.generatedImageSrc = canvas.toDataURL('image/jpeg', 0.88);
                         this.showModal = true;
-                    } catch (e) { alert("生成失败"); } finally { this.isGenerating = false; }
+                    } catch (e) {
+                        console.error(e);
+                        alert(`生成失败：${e && e.message ? e.message : '图片过大或资源加载失败'}`);
+                    } finally { this.isGenerating = false; }
+                },
+                async generateCidolSummaryImage() {
+                    if (!this.ensureCanvasExportAllowed()) return;
+                    const list = this.filteredCidolSkins.filter(s => s.owned);
+                    if (list.length === 0) return;
+                    this.isGenerating = true;
+                    try {
+                        const layout = this.getSummaryLayout(list.length, 6, 300, 400, 44);
+                        const { cols, cardW, cardH, labelH, rows } = layout;
+                        const canvas = document.createElement('canvas');
+                        canvas.width = cols * cardW; canvas.height = rows * (cardH + labelH);
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#020617'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        for (let i = 0; i < list.length; i++) {
+                            const s = list[i];
+                            const x = (i % cols) * cardW;
+                            const y = Math.floor(i / cols) * (cardH + labelH);
+                            const img = await this.downloadImg(this.cidolImagePath(s));
+                            ctx.fillStyle = '#0f172a';
+                            ctx.fillRect(x, y, cardW, cardH + labelH);
+                            this.drawImageContain(ctx, img, x, y, cardW, cardH);
+                            ctx.fillStyle = '#111827';
+                            ctx.fillRect(x, y + cardH, cardW, labelH);
+                            ctx.fillStyle = '#e0f2fe';
+                            ctx.font = `900 ${Math.max(14, Math.floor(cardW * 0.06))}px Arial`;
+                            ctx.fillText(this.getCidolName(s.character), x + cardW * 0.04, y + cardH + labelH * 0.63);
+                            ctx.fillStyle = '#818cf8';
+                            ctx.font = `900 ${Math.max(13, Math.floor(cardW * 0.055))}px Arial`;
+                            ctx.textAlign = 'right';
+                            ctx.fillText(this.getCidolCardLabel(s), x + cardW - cardW * 0.04, y + cardH + labelH * 0.63);
+                            ctx.textAlign = 'left';
+                        }
+
+                        this.generatedImageSrc = canvas.toDataURL('image/jpeg', 0.9);
+                        this.showModal = true;
+                    } catch (e) {
+                        console.error(e);
+                        alert(`生成失败：${e && e.message ? e.message : '图片过大或资源加载失败'}`);
+                    } finally { this.isGenerating = false; }
                 },
                 copyResult() { 
                     if (!this.exportString) return;
@@ -347,13 +814,18 @@
                     el.value = this.exportString; document.body.appendChild(el);
                     el.select(); document.execCommand('copy');
                     document.body.removeChild(el); alert("已复制代码");
+                },
+                copyCidolResult() {
+                    if (!this.cidolExportString) return;
+                    const el = document.createElement('textarea');
+                    el.value = this.cidolExportString; document.body.appendChild(el);
+                    el.select(); document.execCommand('copy');
+                    document.body.removeChild(el); alert("已复制角色皮肤代码");
                 }
             },
-            mounted() { this.init() }
+            async mounted() { this.init(); await this.initCidolCardNames(); await this.initCidolSkins(); }
         }).mount('#app');
     </script>
 </body>
 
 </html>
-</html>
-
