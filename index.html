@@ -498,40 +498,55 @@
                 cidolKey(skin) {
                     return `${skin.character}-${skin.rarity}-${skin.id}`;
                 },
+                buildCidolSkinsFromFiles(files, localData) {
+                    const skins = new Map();
+
+                    files.forEach(fileName => {
+                        const cleanName = decodeURIComponent(String(fileName).split('/').pop());
+                        const match = cleanName.match(/^img_general_cidol-([a-z0-9]+)-([123])-(\d{3})_([01])-full\.webp$/);
+                        if (!match) return;
+
+                        const [, character, rarity, id, variant] = match;
+                        const key = `${character}-${rarity}-${id}`;
+                        if (!skins.has(key)) {
+                            skins.set(key, { character, rarity, id, variants: new Set(), owned: !!localData[key], loaded: false });
+                        }
+                        skins.get(key).variants.add(variant);
+                    });
+
+                    this.cidolSkins = [...skins.values()]
+                        .filter(s => s.variants.has('0') || s.variants.has('1'))
+                        .map(s => ({ ...s, variants: [...s.variants] }));
+                },
                 async initCidolSkins() {
                     const localData = JSON.parse(localStorage.getItem(CIDOL_STORAGE_KEY) || '{}');
+
+                    try {
+                        const response = await fetch('./static/cidol-manifest.json');
+                        if (!response.ok) throw new Error(`manifest HTTP ${response.status}`);
+                        const files = await response.json();
+                        this.buildCidolSkinsFromFiles(files, localData);
+                        if (this.cidolSkins.length > 0) return;
+                    } catch (e) {
+                        console.warn('cidol-manifest.json 读取失败，尝试读取目录索引。', e);
+                    }
+
                     if (window.location.protocol === 'file:') {
-                        alert("角色皮肤需要通过本地服务器读取 static/cidol 目录。请使用 http://127.0.0.1:8000/index.html 打开。");
+                        alert("角色皮肤清单读取失败。请通过本地服务器访问，或确认 static/cidol-manifest.json 已存在。");
                         return;
                     }
 
                     try {
                         const response = await fetch('./static/cidol/');
-                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        if (!response.ok) throw new Error(`directory HTTP ${response.status}`);
 
                         const html = await response.text();
                         const doc = new DOMParser().parseFromString(html, 'text/html');
-                        const skins = new Map();
-
-                        doc.querySelectorAll('a[href]').forEach(link => {
-                            const fileName = decodeURIComponent(link.getAttribute('href').split('/').pop());
-                            const match = fileName.match(/^img_general_cidol-([a-z0-9]+)-([123])-(\d{3})_([01])-full\.webp$/);
-                            if (!match) return;
-
-                            const [, character, rarity, id, variant] = match;
-                            const key = `${character}-${rarity}-${id}`;
-                            if (!skins.has(key)) {
-                                skins.set(key, { character, rarity, id, variants: new Set(), owned: !!localData[key], loaded: false });
-                            }
-                            skins.get(key).variants.add(variant);
-                        });
-
-                        this.cidolSkins = [...skins.values()]
-                            .filter(s => s.variants.has('0') || s.variants.has('1'))
-                            .map(s => ({ ...s, variants: [...s.variants] }));
+                        const files = [...doc.querySelectorAll('a[href]')].map(link => link.getAttribute('href'));
+                        this.buildCidolSkinsFromFiles(files, localData);
                     } catch (e) {
                         console.error(e);
-                        alert("角色皮肤目录读取失败。请确认通过本地服务器访问，并且 static/cidol 目录允许目录索引。");
+                        alert("角色皮肤清单读取失败。请确认 static/cidol-manifest.json 已提交到 GitHub。");
                     }
                 },
                 toggleCidolSkin(skin) {
