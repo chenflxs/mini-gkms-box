@@ -15,12 +15,25 @@ jobs:
     steps:
       - name: Checkout target repo
         uses: actions/checkout@v3
-
-      - name: Sync Upstream
-        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
         with:
-          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-          upstream_sync_repo: kitsurato/mini-gkms-box
-          upstream_sync_branch: main  # 上游要同步的分支名
-          target_sync_branch: main    # 你 Fork 的目标分支名
-          test_mode: false
+          fetch-depth: 0 # 必须设置为 0 以获取所有历史记录进行合并
+
+      - name: Sync and Merge Upstream
+        run: |
+          # 配置 Git 用户信息
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 添加上游仓库并获取更新
+          git remote add upstream https://github.com/kitsurato/mini-gkms-box.git
+          git fetch upstream
+          
+          # 将上游修改合并到当前分支
+          # 如果有冲突，Git 会尝试自动合并。由于你只是在文件末尾添加了内容，通常不会冲突。
+          git merge upstream/main --no-edit || {
+            echo "合并冲突！请手动处理。"
+            exit 1
+          }
+          
+          # 推送合并后的代码
+          git push origin main
